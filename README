@@ -1,0 +1,112 @@
+PolymorphicAssociation
+
+I had recently read http://m.onkey.org/2007/8/14/excuse-me-wtf-is-polymorphs from 
+Pratik Naik and went through has_many_polymorphs plugin 
+(http://blog.evanweaver.com/files/doc/fauna/has_many_polymorphs/files/README.html)
+created by Evan Weaver. The plugin is great, it's quite a big improvement from polymorphic association
+built in Rails. 
+
+class Person < ActiveRecord::Base
+  has_many_polymorphs :ownables, :from => [:dvds, :cars, :books], :through => :ownerships
+end
+
+class Ownership < ActiveRecord::Base
+  belongs_to :person
+  belongs_to :ownable, :polymorphic => true
+end
+
+class Dvd < ActiveRecord::Base 
+end
+
+class Car < ActiveRecord::Base   
+end
+
+class Book < ActiveRecord::Base   
+end
+
+Now we can do something like
+
+# Buy a new car!
+>> p = Person.find(:first)
+>> p.cars << Car.create(:name => 'Ferrari')  
+>> p.cars.count
+=> 1
+>> p.dvds << Dvd.create(:name => "Hello world")
+>> p.dvds.count
+=> 1
+>> p.ownables.count
+=> 2
+
+Sweet, just 3 lines of model code. 
+
+Inspired by the has_many_polymorps plugin, I decided to push it little bit more. At first, we can still see some
+issues with has_many_polymorps.
+
+1. We still need to create Ownership model, and of course, a migration for it (it means a database tables). In short,
+we need to create one model (database table + migration) for each association. But I want NO TABLE.
+
+2. You can see from the example above, p.dvds or p.books will give you a list of dvd or books owned by that person. But what
+will happen if we want to add one more association like favorite, or borrow? In this case, p.books doesn't tell you this a 
+list of books that person owns or that person borrows from someone else.
+
+3. How about both sides are polymorphs? For example we want to add Family model to the system. has_many_polymorphs does offer
+some way to handle that (http://blog.evanweaver.com/files/doc/fauna/has_many_polymorphs/files/README.html). But from my view,
+it's a little bit ugly and awkward.
+
+To solve these issues, I have come up a plugi called PolymorphicAssociation (I couldn't find a better name for it).
+The models now will be:
+
+class Person < ActiveRecord::Base
+  via_polymorphs do
+    has_many :ownables, :from => [:dvds, :cars, :books]
+    has_many :borrowed_items, :from => [:dvds, :books]
+    # or we can say
+    # has :borrowed, :many => items, :from => [:dvds, :books]
+  end  
+end
+
+class Family < ActiveRecord::Base
+  via_polymorphs do
+    has_many :ownables, :from => [:dvds, :cars, :books]
+    has :borrowed, :many => items, :from => [:dvds, :car, :books]
+  end  
+end
+
+# I adjusted the logic a little bit, a person cannot borrow a car, only family can.
+
+class Dvd < ActiveRecord::Base 
+  has_one: owner, :through => ownables
+  has_one: borrower, :through => borrowed_items
+end
+
+class Car < ActiveRecord::Base   
+  has_one: owner, :through => ownables
+  has_one: borrower, :through => borrowed_items
+end
+
+class Book < ActiveRecord::Base   
+  has_one: owner, :through => ownables
+  has_one: borrower, :through => borrowed_items
+end
+
+Few more lines of code, but no extra model, and we see what we have now:
+
+p = Person.create
+p.ownables
+p.ownables.dvds
+p.ownables.cars
+p.ownables.books
+p.borrowed_items
+p.borrowed_items.dvds
+
+and pretty much the same for Family, and we also have
+
+b = Book.find(:first)
+b.onwer
+b.borrower
+
+and so on.
+
+Above I said no extra model. What I really mean is no extra table for each association.
+The plugin comes with 3 models and their migrations (you need to copy the migration files to 
+your migrate folder and do nothing with the models), but that's all what you need.
