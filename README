@@ -62,19 +62,27 @@ end
 # I adjusted the logic a little bit, a person cannot borrow a car, only family can.
 
 class Dvd < ActiveRecord::Base 
-  has_one: owner, :through => ownables
-  has_one: borrower, :through => borrowed_items
+  via_polymorphs do
+    has_one: owner, :through => ownables
+    has_one: borrower, :through => borrowed_items
+  end
 end
 
 class Car < ActiveRecord::Base   
-  has_one: owner, :through => ownables
-  has_one: borrower, :through => borrowed_items
+  via_polymorphs do
+    has_one: owner, :through => ownables
+    has_one: borrower, :through => borrowed_items
+  end
 end
 
 class Book < ActiveRecord::Base   
-  has_one: owner, :through => ownables
-  has_one: borrower, :through => borrowed_items
+  via_polymorphs do
+    has_one: owner, :through => ownables
+    has_one: borrower, :through => borrowed_items
+  end
 end
+
+If you don't like the via_polymorphs do ... end block, you can use polymorphically_has_many, polymorphically_has_one, and polymorphically_has instead.
 
 Few more lines of code, but no extra model, and we see what we have now:
 
